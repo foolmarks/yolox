@@ -1,0 +1,66 @@
+# start the docker container
+./start.py
+
+
+# navigate to workspace
+cd docker/sima-cli
+
+
+# run graph surgery
+python yolox_surgery_no_reshape.py --size s
+
+# unzip images
+unzip calib_images.zip
+unzip test_images.zip
+
+
+# run FP32 ONNX model
+python run_onnx.py
+
+
+# quantize, compile, evaluate
+python run_modelsdk.py -e 
+
+# test model in HW
+python run_accelmode.py
+
+
+#  benchmark
+python ./get_fps/network_eval/network_eval.py \
+    --model_file_path   ./build/yolox_s_opt_no_reshapes/benchmark/yolox_s_opt_no_reshapes_stage1_mla.elf \
+    --mpk_json_path     ./build/yolox_s_opt_no_reshapes/benchmark/yolox_s_opt_no_reshapes_mpk.json \
+    --dv_host           192.168.1.29 \
+    --image_size        640 640 3 \
+    --verbose \
+    --bypass_tunnel \
+    --max_frames        100 \
+    --batch_size        1
+
+
+Running model in MLA-only mode
+Copying the model files to DevKit
+sima@192.168.1.29's password: 
+FPS = 560
+FPS = 566
+FPS = 568
+FPS = 569
+FPS = 570
+FPS = 571
+FPS = 571
+FPS = 571
+FPS = 572
+FPS = 572
+Ran 100 frame(s)
+
+
+# make baseline GStreamer application
+mpk project create --model-path ./build/yolox_s_opt_no_reshapes/yolox_s_opt_no_reshapes_mpk.tar.gz --src-plugin rtspsrc --input-width 1280 --input-height 720
+
+# compile pipeline
+cd yolox_s_opt_no_reshapes_mpk_rtspsrc
+mpk create --board-type modalix --clean -s . -d .
+
+mpk device connect -d devkit -u sima -p edgeai -t 192.168.1.29
+mpk deploy -f ./project.mpk -d devkit -t 192.168.1.29
+
+

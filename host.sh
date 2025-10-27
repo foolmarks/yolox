@@ -1,0 +1,1 @@
+GST_DEBUG=0 gst-launch-1.0 udpsrc port=7000 ! application/x-rtp,encoding-name=H264,payload=96 ! rtph264depay ! 'video/x-h264,stream-format=byte-stream,alignment=au' !  avdec_h264  ! fpsdisplaysink sync=0
