@@ -3,3 +3,5 @@ build/
 *.log
 calib_images/
 test_images/
+project.mpk
+yolox_s_opt_no_reshapes_mpk_rtspsrc_plugin_version_index.json
