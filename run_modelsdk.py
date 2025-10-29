@@ -206,15 +206,18 @@ def implement(args):
   input shapes dictionary: each key,value pair is an input name (string) and a shape (tuple)
   '''
   input_shapes_dict, input_types_dict = _get_onnx_input_shapes_dtypes(args.model_path)
-  print(input_shapes_dict)
-  print(input_types_dict)
-
+  print(DIVIDER)
+  print('Model Inputs:')
+  for name, dims in input_shapes_dict.items():
+     print(f'{name}: {dims}')
+  print(DIVIDER)
      
   # importer parameters
   importer_params: ImporterParams = onnx_source(model_path=args.model_path,
                                                 shape_dict=input_shapes_dict,
                                                 dtype_dict=input_types_dict)
   
+
   # load ONNX floating-point model into SiMa's LoadedNet format
   target = gen2_target if args.generation == 2 else gen1_target
   loaded_net = load_model(importer_params,target=target)
@@ -342,7 +345,7 @@ def implement(args):
   print(f'Compiling with batch size set to {args.batch_size}',flush=True)
   quant_model.compile(output_path=results_dir,
                       batch_size=args.batch_size,
-                      log_level=logging.INFO)  
+                      log_level=logging.WARN)  
 
   print(f'Wrote compiled model to {results_dir}/{output_model_name}_mpk.tar.gz',flush=True)
 

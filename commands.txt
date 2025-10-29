@@ -37,20 +37,6 @@ python ./get_fps/network_eval/network_eval.py \
     --batch_size        1
 
 
-Running model in MLA-only mode
-Copying the model files to DevKit
-sima@192.168.1.29's password: 
-FPS = 560
-FPS = 566
-FPS = 568
-FPS = 569
-FPS = 570
-FPS = 571
-FPS = 571
-FPS = 571
-FPS = 572
-FPS = 572
-Ran 100 frame(s)
 
 
 # make baseline GStreamer application
