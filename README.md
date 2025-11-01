@@ -346,7 +346,7 @@ mkdir -p ./yolox_s_opt_no_reshapes_mpk_rtspsrc/plugins/yolovx_postproc_overlay
 cp /usr/local/simaai/plugin_zoo/gst-simaai-plugins-base/gst/templates/aggregator_python/python/*.py ./yolox_s_opt_no_reshapes_mpk_rtspsrc/plugins/yolovx_postproc_overlay/.
 ```
 
-Copy the contents of payload.py into ./yolox_s_opt_no_reshapes_mpk_rtspsrc/plugins/yolovx_postproc_overlay/payload.py
+Copy the contents of payload_contents.py into ./yolox_s_opt_no_reshapes_mpk_rtspsrc/plugins/yolovx_postproc_overlay/payload.py
 
 
 Open 'application.json' and add the following into the "plugins" section of the JSON file:
