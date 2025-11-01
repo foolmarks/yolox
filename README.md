@@ -465,5 +465,9 @@ mpk deploy -f ./yolox_s_opt_no_reshapes_mpk_rtspsrc/project.mpk -d devkit -t <ta
 * yolox_surgery_no_reshape.py - graph surgery script (not used)
 * yolo_s_opt_no_reshapes.onnx - post surgery ONNX model
 * run_onnx.py - executes and evaluates the floating-point ONNX model
-* run_modelsdk.py - quantizes & compiles, optionally evaluates the quantized 
-* 
+* run_modelsdk.py - quantizes & compiles, optionally evaluates the quantized model
+* payload_contents.py - contents of custom Python plugin
+* FINAL_yolox_s_opt_no_reshapes_mpk_rtspsrc - working version of the final GStreamer pipeline
+* get_fps - scripts for benchmarking
+
+
