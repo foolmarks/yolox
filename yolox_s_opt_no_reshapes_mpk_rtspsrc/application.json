@@ -1,0 +1,84 @@
+{
+    "name": "yolox_s_opt_no_reshapes_mpk_rtspsrc",
+    "appId": "yolox_s_opt_no_reshapes_mpk_rtspsrc",
+    "sequence": 1,
+    "pipelines": [
+        {
+            "name": "yolox_s_opt_no_reshapes_mpk_rtspsrc_Pipeline",
+            "sequence": 1,
+            "plugins": [
+                {
+                    "name": "simaaiprocesspreproc_1",
+                    "pluginGid": "processcvu",
+                    "sequence": 1,
+                    "resources": {
+                        "configs": [
+                            "cfg/0_preproc.json"
+                        ]
+                    }
+                },
+                {
+                    "name": "simaaiprocessmla_1",
+                    "pluginGid": "processmla",
+                    "sequence": 2,
+                    "resources": {
+                        "configs": [
+                            "cfg/0_process_mla.json"
+                        ],
+                        "shared": [
+                            "res/yolox_s_opt_no_reshapes_stage1_mla.elf"
+                        ]
+                    }
+                },
+                {
+                    "name": "simaaiprocessdetess_dequant_1",
+                    "pluginGid": "processcvu",
+                    "sequence": 3,
+                    "resources": {
+                        "configs": [
+                            "cfg/0_postproc.json"
+                        ]
+                    }
+                }
+            ],
+            "connections": [],
+            "meta": {
+                "groups": []
+            },
+            "dependencies": [],
+            "resources": [
+                {
+                    "name": "globalLibs",
+                    "location": "libs",
+                    "destination": {
+                        "provider": "RPM",
+                        "type": "lib"
+                    }
+                }
+            ],
+            "gst": "rtspsrc location=<RTSP_SRC> ! rtph264depay wait-for-keyframe=true ! h264parse ! 'video/x-h264, parsed=true, stream-format=(string)byte-stream, alignment=(string)au, width=(int)[1,4096], height=(int)[1,4096]' ! simaaidecoder name=decoder dec-fmt='YUV420P' sima-allocator-type=2 ! 'video/x-raw' ! simaaiprocesscvu name=simaaiprocesspreproc_1 ! simaaiprocessmla name=simaaiprocessmla_1 ! simaaiprocesscvu name=simaaiprocessdetess_dequant_1 ! fakesink"
+        }
+    ],
+    "configuration": {
+        "installationPrefixes": {
+            "configurations": "/data/simaai/applications/yolox_s_opt_no_reshapes_mpk_rtspsrc/etc",
+            "binaries": "/data/simaai/applications/yolox_s_opt_no_reshapes_mpk_rtspsrc/bin",
+            "resources": "/data/simaai/applications/yolox_s_opt_no_reshapes_mpk_rtspsrc/share",
+            "libraries": "/data/simaai/applications/yolox_s_opt_no_reshapes_mpk_rtspsrc/lib",
+            "globalLibs": "/usr/lib"
+        },
+        "compilation": {
+            "copyPokyLibs": false
+        },
+        "gst": {
+            "options": [
+                "--gst-plugin-path=/data/simaai/applications/yolox_s_opt_no_reshapes_mpk_rtspsrc/lib"
+            ]
+        },
+        "environment": [
+            "GST_DEBUG=0",
+            "LD_LIBRARY_PATH=/data/simaai/applications/yolox_s_opt_no_reshapes_mpk_rtspsrc/lib"
+        ]
+    },
+    "manifestVersion": "2.0.0"
+}

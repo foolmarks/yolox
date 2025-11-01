@@ -220,7 +220,7 @@ def implement(args):
 
   # load ONNX floating-point model into SiMa's LoadedNet format
   target = gen2_target if args.generation == 2 else gen1_target
-  loaded_net = load_model(importer_params,target=target)
+  loaded_net = load_model(importer_params,target=target,log_level=logging.INFO)
   print(f'Loaded model from {args.model_path}',flush=True)
 
 
@@ -272,10 +272,6 @@ def implement(args):
     annotated_images.mkdir(parents=True, exist_ok=False)
     print(f"Annotated images will be written to {annotated_images}", flush=True)
 
-
-
-    color_palette = np.random.uniform(0, 255, size=(80, 3))
-
     test_data = utils.list_image_paths(args.test_dir)
     num_images = min(args.num_test_images, len(test_data))
 
@@ -325,7 +321,7 @@ def implement(args):
               #score = scores[i]
               class_id = int(labels[i])
               x1, y1, x2, y2 = box
-              color = color_palette[class_id]
+              color = utils.color_palette[class_id]
               color = tuple(map(int, color))
 
               cv2.rectangle(img_bgr, (int(x1), int(y1)), (int(x2), int(y2)), color, 2)
@@ -349,6 +345,7 @@ def implement(args):
 
   print(f'Wrote compiled model to {results_dir}/{output_model_name}_mpk.tar.gz',flush=True)
 
+  # extract elf anfd mpk json for use in bechmarking
   with tarfile.open(f'{results_dir}/{output_model_name}_mpk.tar.gz') as tar:
      tar.extract(f'{output_model_name}_mpk.json' ,f'{results_dir}/benchmark')
      tar.extract(f'{output_model_name}_stage1_mla.elf' ,f'{results_dir}/benchmark')
@@ -372,7 +369,7 @@ def run_main():
   ap.add_argument('-ti', '--num_test_images',   type=int, default=10, help='Number of test images. Default is 10')
   ap.add_argument('-g',  '--generation',        type=int, default=2, choices=[1,2], help='Target device: 1 = DaVinci, 2 = Modalix. Default is 2')
   ap.add_argument('-e',  '--evaluate',          action="store_true", default=False, help="If set, evaluate the quantized model") 
-  ap.add_argument('-cm',  '--calib_method',     type=str, default='min_max', choices=['mse','min_max','moving_average','entropy','percentile'], help="Calibration method. Default is min_max") 
+  ap.add_argument('-cm', '--calib_method',      type=str, default='min_max', choices=['mse','min_max','moving_average','entropy','percentile'], help="Calibration method. Default is min_max") 
   args = ap.parse_args()
 
   print('\n'+DIVIDER,flush=True)

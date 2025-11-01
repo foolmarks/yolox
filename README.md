@@ -100,7 +100,7 @@ Wrote output image to /home/docker/sima-cli/build/onnx_pred/test_000000581062.jp
 Images annotated with bounding boxes are writted itno the ./build/onnx_pred folder.
 
 
-<img src="./readme_images/onnx_pred.jpg" alt="" style="height: 500px; width:500px;"/>
+<img src="./readme_images/onnx_test_000000574520.jpg" alt="" style="height: 500px; width:500px;"/>
 
 
 
@@ -109,8 +109,8 @@ Images annotated with bounding boxes are writted itno the ./build/onnx_pred fold
 The run_modelsdk.py script will do the following:
 
 * load the floating-point ONNX model.
-* quantize using calibration data and quantization parameters set using command line arguments.
-* test the quantized model accuracy using pre-processed images.
+* quantize using pre-processed calibration data and quantization parameters set using command line arguments.
+* test the quantized model accuracy using pre-processed images. Annotated images are written to build/quant_pred
 * compile and then untar to extract the .elf and .json files (for use in benchmarking on the target board)
 
 *Note: the quantization is done using min-max calibration method instead of the default mse method.*
@@ -170,17 +170,23 @@ Wrote compiled model to /home/docker/sima-cli/build/yolox_s_opt_no_reshapes/yolo
 
 
 
+The evaluation of the quantized model generates images annotated with bounding boxes and are written into the ./build/quant_pred folder.
+
+
+<img src="./readme_images/quant_test_000000574520.jpg" alt="" style="height: 500px; width:500px;"/>
+
+
+
+
 ## Test model on hardware ##
 
-Run the model directly on the target board. This requires the target board to be reachable via ssh. Make sure to set the IP address, password and user name of the target board:
+Run the model directly on the target board. This requires the target board to be reachable via ssh. Make sure to set the IP address of the target board:
 
 
 ```shell
 python run_accelmode.py -hn <target_ip_address>
 ```
 
-
-The images are written into build/accel_pred folder.
 
 
 The output in the console will be something like this:
@@ -228,9 +234,18 @@ Wrote output image to /home/docker/sima-cli/build/accel_pred/test_000000581062.j
 ```
 
 
+The evaluation of the compiled model generates images annotated with bounding boxes and are written into the ./build/accel_pred folder.
+
+
+
+<img src="./readme_images/accel_test_000000574520.jpg" alt="" style="height: 500px; width:500px;"/>
+
+
+
+
 ## Benchmarking model on hardware ##
 
-The model can be benchmarked on the target board:
+The model can be benchmarked on the target board. This uses random data to test the throughput - note that this only tests the MLA throughput.
 
 
 
@@ -246,7 +261,7 @@ python ./get_fps/network_eval/network_eval.py \
     --batch_size        1
 ```
 
-  The measured frame rate will be printed in the console:
+  The measured throughput in frames per second (FPS) will be printed in the console:
 
 ```shell
 Running model in MLA-only mode
@@ -280,16 +295,20 @@ mpk project create --model-path ./build/yolox_s_opt_no_reshapes/yolox_s_opt_no_r
 This will make a folder called 'yolox_s_opt_no_reshapes_mpk_rtspsrc' in which the baseline GStreamer pipeline is written.
 
 
-We now need to modify certain files with this pipeline to make it work.
+<img src="./readme_images/baseline.png" alt="" style="height: 400px; width:1000px;"/>
 
 
-### Modify the Preprocessing configutation file ###
+
+We now need to modify a few files of this pipeline to make it work.
+
+
+### Modify the Preprocessing Configuration File ###
 
 
 Modify CVU configuration 0_preproc.json as follows:
 
-  - change normalize to false: "normalize": false,
-  - change input image type to NV12: "input_img_type": "NV12",
+  - change normalize to false: `"normalize": false,`
+  - change input image type to NV12: `"input_img_type": "NV12",`
 
 
 
@@ -297,7 +316,7 @@ Modify CVU configuration 0_preproc.json as follows:
 ### Add the Python custom plugin ###
 
 
-Modify .project/pluginsInfo.json to add the custom Python plugin called 'yolox_postproc_overlay'  :
+Modify .project/pluginsInfo.json to add a new plugin called 'yolox_postproc_overlay' - this will be the   :
 
 
 ```shell
@@ -350,10 +369,18 @@ Replace the gst string in application.json with this:
     "gst": "rtspsrc location=<RTSP STREAM URL> ! rtph264depay wait-for-keyframe=true ! h264parse ! 'video/x-h264, parsed=true, stream-format=(string)byte-stream, alignment=(string)au, width=(int)[1,4096], height=(int)[1,4096]' ! simaaidecoder name=decoder sima-allocator-type=2 ! tee name=source ! queue2 ! simaaiprocesscvu  name=simaaiprocesspreproc_1 ! simaaiprocessmla  name=simaaiprocessmla_1 ! simaaiprocesscvu  name=simaaiprocessdetess_dequant_1 ! yolox_postproc_overlay  name='simaai_yolox_postproc_overlay' ! queue2 ! 'video/x-raw,format=NV12,width=1280,height=720,framerate=30/1' ! simaaiencoder enc-bitrate=4000 name=encoder1 ! h264parse ! rtph264pay ! udpsink host=<HOST IP ADDRESS> port=<HOST PORT NUMBER> source. ! queue2 ! simaai_yolox_postproc_overlay. "
 ```
 
-Edit the gst string to insert your RTPS Stream URL, for example: *rtspsrc location=rtsp://192.168.1.20:8080/h264_ulaw.sdp*  - Check the IP camera details to find the correct URL.
+Edit the gst string to insert your RTPS Stream URL, for example: *rtspsrc location=rtsp://192.168.1.20:8080/h264_ulaw.sdp*  - Check your IP camera details to find the correct URL.
 
 Edit the gst string to insert your host machine IP address and port number, for example: *udpsink host=192.168.1.59 port=7000*
 
+
+This new gst string gives the structure to the final pipeline:
+
+<img src="./readme_images/final.png" alt="" style="height: 400px; width:600px;"/>
+
+
+
+### Edit Port Number in the Display Script ###
 
 The host.sh script contains a Gstreamer command to display the output stream from the target board.  The UDP port number in the command must match the UDP port number used in the gst string in application.json. Open the host.sh with a text editor and modify the UDP port number, for example: *udpsrc port=7000*
 
@@ -432,3 +459,11 @@ mpk deploy -f ./yolox_s_opt_no_reshapes_mpk_rtspsrc/project.mpk -d devkit -t <ta
 ```
 
 
+## Files
+
+* yolo_s.onnx -  original YoloX Small model (not used)
+* yolox_surgery_no_reshape.py - graph surgery script (not used)
+* yolo_s_opt_no_reshapes.onnx - post surgery ONNX model
+* run_onnx.py - executes and evaluates the floating-point ONNX model
+* run_modelsdk.py - quantizes & compiles, optionally evaluates the quantized 
+* 

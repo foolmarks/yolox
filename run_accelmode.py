@@ -44,7 +44,7 @@ import argparse
 import numpy as np
 from pathlib import Path
 import cv2
-from typing import List, Tuple
+
 
 import utils
 
@@ -134,7 +134,6 @@ def implement(args):
     '''
     Evaluate results
     '''
-    color_palette = np.random.uniform(0, 255, size=(80, 3))
     for i in range(num_test_images):
 
         print(f"Processing image: {image_files[i]}") 
@@ -170,7 +169,7 @@ def implement(args):
               #score = scores[i]
               class_id = int(labels[i])
               x1, y1, x2, y2 = box
-              color = color_palette[class_id]
+              color = utils.color_palette[class_id]
               color = tuple(map(int, color))
 
               cv2.rectangle(img_bgr, (int(x1), int(y1)), (int(x2), int(y2)), color, 2)

@@ -50,7 +50,6 @@ import sys, shutil
 import argparse
 import numpy as np
 from pathlib import Path
-from typing import List, Tuple
 import cv2
 
 import utils
@@ -100,7 +99,6 @@ def implement(args):
 
  
     # loop over test images
-    color_palette = np.random.uniform(0, 255, size=(80, 3))
     inputs = dict()
     for i in range(num_test_images):
         print(f"Processing image: {test_data[i]}") 
@@ -108,7 +106,7 @@ def implement(args):
         filename = Path(test_data[i]).name
         img_bgr, inputs['images'] = utils.preprocess(test_data[i], 640, 640, transpose=True)
     
-        # run inference - outputs alist of numpy arrays
+        # run inference - outputs a list of numpy arrays
         # outputs shapes: 1, 85, 80, 80) (1, 85, 40, 40) (1, 85, 20, 20)
         pred = ort_sess.run(None, inputs)
 
@@ -144,7 +142,7 @@ def implement(args):
               #score = scores[i]
               class_id = int(labels[i])
               x1, y1, x2, y2 = box
-              color = color_palette[class_id]
+              color = utils.color_palette[class_id]
               color = tuple(map(int, color))
 
               cv2.rectangle(img_bgr, (int(x1), int(y1)), (int(x2), int(y2)), color, 2)

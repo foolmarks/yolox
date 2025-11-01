@@ -49,6 +49,88 @@ import cv2
 
 DIVIDER = '-'*50
 
+# bounding box colors
+color_palette = np.array(
+                       [[201, 216, 192],
+                        [ 13, 137, 110],
+                        [248,  51, 188],
+                        [211,  49, 216],
+                        [ 55, 113, 113],
+                        [ 83,  75,  76],
+                        [106,   4, 197],
+                        [ 22, 188,  49],
+                        [242, 163,   4],
+                        [139, 149, 128],
+                        [101,  33, 134],
+                        [255,  30, 186],
+                        [129, 253,  52],
+                        [ 17, 157,   2],
+                        [100, 250, 219],
+                        [  4,  86,  22],
+                        [243, 186,  25],
+                        [  6, 153, 135],
+                        [109, 217,  51],
+                        [ 68,  46,  49],
+                        [ 64, 114, 219],
+                        [213, 240, 212],
+                        [  4,  26, 218],
+                        [ 78, 174, 211],
+                        [128, 191, 107],
+                        [134,  56, 158],
+                        [ 38, 158,  80],
+                        [209, 151, 151],
+                        [226,  13, 216],
+                        [ 35, 199,  10],
+                        [233, 158, 230],
+                        [113, 203, 253],
+                        [ 30, 220,  39],
+                        [246,  15,   2],
+                        [193,  32, 115],
+                        [244, 127,  51],
+                        [ 43, 223, 140],
+                        [133, 142, 138],
+                        [186,   3, 175],
+                        [114,  76, 250],
+                        [189,  85, 210],
+                        [ 42,  80, 151],
+                        [ 21, 147, 142],
+                        [165, 119, 199],
+                        [195,  46,  92],
+                        [  8, 189,  51],
+                        [ 32,  67,  81],
+                        [119, 211,  50],
+                        [ 55,  41, 112],
+                        [ 18, 178,  34],
+                        [  4, 236, 193],
+                        [123, 249, 245],
+                        [ 73, 232, 170],
+                        [193, 149,  18],
+                        [205, 207, 142],
+                        [214, 107, 118],
+                        [130, 130, 165],
+                        [ 82, 117, 184],
+                        [155, 197,  79],
+                        [ 81, 217, 173],
+                        [150, 253, 171],
+                        [151,  28, 134],
+                        [226, 240, 199],
+                        [202, 221, 192],
+                        [ 44, 248,  45],
+                        [134, 101,  71],
+                        [ 25, 132, 167],
+                        [167,  42,  54],
+                        [238, 118,  90],
+                        [212,  23, 117],
+                        [199, 202, 234],
+                        [218, 184, 109],
+                        [ 75, 160,  62],
+                        [168, 166,  12],
+                        [188,  11, 180],
+                        [250, 219, 217],
+                        [115,  42, 123],
+                        [ 31,  22, 201],
+                        [157,  52,  39],
+                        [147, 174, 195]], dtype=np.uint8)
 
 def list_image_paths(folder: str) -> List[str]:
   """
@@ -75,12 +157,13 @@ def list_image_paths(folder: str) -> List[str]:
 
 def preprocess(image_path: str, target_height: int, target_width: int, transpose: bool = False) -> Tuple[np.ndarray, np.ndarray]:
     """
-    1) Reads an image from `image_path` into a NumPy array (BGR, forced 3 channels).
-    2) Pads with black borders to make it square.
-    3) Resizes to (target_height, target_width).
-    4) Converts BGR -> RGB.
-    5) Adds a batch dimension at axis 0 so shape is (1, H, W, C).
-    6) Returns padded, resized image and preprocesed image as contiguous np.float32 array (values in [0, 255], not normalized).
+    Reads an image from `image_path` into a NumPy array (BGR, forced 3 channels).
+    Pads with black borders to make it square.
+    Resizes to (target_height, target_width).
+    Converts BGR -> RGB.
+    Adds a batch dimension at axis 0 so shape is (1, H, W, C).
+    Optionally transposes to NCHW format
+    Returns padded, resized image as contiguous np.float32 array (values in [0, 255], not normalized).
     """
     if target_height <= 0 or target_width <= 0:
         raise ValueError("target_height and target_width must be positive integers.")
@@ -138,9 +221,6 @@ def get_model_outputs(input_buffer):
     #    arr = input_buffer[start: start+seg_size].reshape(out_shape)
     #    model_outputs.append(arr)
     #    start += seg_size
-    #first_output = np.expand_dims(model_outputs[0], axis=0).reshape(1, -1, 85)  # (1, 80, 80, 85) -> (1, 6400, 85)
-    #second_output = np.expand_dims(model_outputs[1], axis=0).reshape(1, -1, 85) # (1, 40, 40, 85) -> (1, 1600, 85)
-    #third_output = np.expand_dims(model_outputs[2], axis=0).reshape(1, -1, 85) # (1, 20, 20, 85) -> (1, 400, 85)
 
     first_output = np.expand_dims(input_buffer[0], axis=0).reshape(1, -1, 85)  # (1, 80, 80, 85) -> (1, 6400, 85)
     second_output = np.expand_dims(input_buffer[1], axis=0).reshape(1, -1, 85) # (1, 40, 40, 85) -> (1, 1600, 85)
