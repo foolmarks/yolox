@@ -4,6 +4,8 @@
 
 # navigate to workspace
 cd docker/sima-cli
+unzip calib_images.zip
+unzip test_images.zip
 
 
 # run graph surgery
@@ -89,7 +91,7 @@ application.json
 cd yolox_s_opt_no_reshapes_mpk_rtspsrc
 mpk create --board-type modalix --clean -s . -d .
 
-mpk device connect -d devkit -u sima -p edgeai -t 192.168.1.29
-mpk deploy -f ./project.mpk -d devkit -t 192.168.1.29
+mpk device connect -d devkit -u sima -p edgeai -t 192.168.8.20
+mpk deploy -f ./project.mpk -d devkit -t 192.168.8.20
 
 

@@ -53,6 +53,12 @@ Navigate into the working directory:
 cd docker/sima-cli
 ```
 
+Unzip the test and calibration images:
+
+```shell
+unzip calib_images.zip
+unzip test_images.zip
+```
 
 ## Execute Floating-Point ONNX model ##
 
@@ -456,9 +462,7 @@ Deploy the complete YoloX application:
 
 ```shell
 mpk deploy -f ./yolox_s_opt_no_reshapes_mpk_rtspsrc/project.mpk -d devkit -t <target_ip_address>
-```
-
-
+``` 
 ## Files
 
 * yolo_s.onnx -  original YoloX Small model (not used)
@@ -466,6 +470,8 @@ mpk deploy -f ./yolox_s_opt_no_reshapes_mpk_rtspsrc/project.mpk -d devkit -t <ta
 * yolo_s_opt_no_reshapes.onnx - post surgery ONNX model
 * run_onnx.py - executes and evaluates the floating-point ONNX model
 * run_modelsdk.py - quantizes & compiles, optionally evaluates the quantized model
+* run_accelmode.py - executes the model in hardware
+* utils.py - common utilities functions
 * payload_contents.py - contents of custom Python plugin
 * FINAL_yolox_s_opt_no_reshapes_mpk_rtspsrc - working version of the final GStreamer pipeline
 * get_fps - scripts for benchmarking

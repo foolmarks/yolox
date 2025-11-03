@@ -51,14 +51,12 @@ import cv2
 from pathlib import Path
 from typing import List, Dict
 
-import dataclasses
-
 import utils
 
 
 # Palette-specific imports
 from afe.load.importers.general_importer import ImporterParams, onnx_source
-from afe.apis.defines import default_quantization, gen1_target, gen2_target, CalibrationMethod
+from afe.apis.defines import default_quantization, QuantizationScheme, gen1_target, gen2_target, gen1_target, gen2_target, CalibrationMethod
 from afe.ir.tensor_type import ScalarType
 from afe.apis.loaded_net import load_model
 from afe.apis.error_handling_variables import enable_verbose_error_messages
@@ -200,7 +198,7 @@ def implement(args):
 
   
   '''
-  Load the floating-point ONNX model
+  Load the floating-point ONNX model into Sima format
   input types & shapes are dictionaries
   input types dictionary: each key,value pair is an input name (string) and a type
   input shapes dictionary: each key,value pair is an input name (string) and a shape (tuple)
@@ -238,10 +236,24 @@ def implement(args):
   '''
   print(f'Quantizing with {len(calib_data)} calibration samples',flush=True)
 
-  calibration_method = CalibrationMethod.from_str(args.calib_method)
-  quant_config = dataclasses.replace(default_quantization, calibration_method=calibration_method)
 
 
+  # set up quantization parameters
+  if (args.bf16):
+      weights_quant_scheme=QuantizationScheme(asymmetric=False, per_channel=False, bf16=True)
+      activ_quant_scheme=QuantizationScheme(asymmetric=False, per_channel=False, bf16=True)
+  else:
+      weights_quant_scheme=QuantizationScheme(asymmetric=False, per_channel=True, bits=8)
+      activ_quant_scheme=QuantizationScheme(asymmetric=True, per_channel=False, bits=args.quant_bits)
+
+  quant_config = default_quantization.with_activation_quantization(activ_quant_scheme) \
+                                     .with_weight_quantization(weights_quant_scheme) \
+                                     .with_bias_correction(args.bias_corr) \
+                                     .with_calibration(CalibrationMethod.from_str(args.calib_method)) \
+                                     .with_channel_equalization(args.chan_equal) \
+                                     .with_smooth_quant(False)
+  
+  # quantize
   quant_model = loaded_net.quantize(calibration_data=length_hinted(len(calib_data),calib_data),
                                     quantization_config=quant_config,
                                     model_name=output_model_name,
@@ -359,17 +371,21 @@ def run_main():
   
   # construct the argument parser and parse the arguments
   ap = argparse.ArgumentParser()
-  ap.add_argument('-bd', '--build_dir',         type=str, default='build', help='Path of build folder. Default is build')
-  ap.add_argument('-m',  '--model_path',        type=str, default='yolox_s_opt_no_reshapes.onnx', help='path to FP model')
-  ap.add_argument('-b',  '--batch_size',        type=int, default=1, help='requested batch size. Default is 1')
-  ap.add_argument('-om', '--output_model_name', type=str, default='yolox_s_opt_no_reshapes', help="Output model name. Default is yolox_s_opt_no_reshapes")
-  ap.add_argument('-cd', '--calib_dir',         type=str, default='./calib_images', help='Path to calib images folder. Default is ./calib_images')
-  ap.add_argument('-td', '--test_dir',          type=str, default='./test_images', help='Path to test images folder. Default is ./test_images')
-  ap.add_argument('-ci', '--num_calib_images',  type=int, default=50, help='Number of calibration images. Default is 50')
-  ap.add_argument('-ti', '--num_test_images',   type=int, default=10, help='Number of test images. Default is 10')
-  ap.add_argument('-g',  '--generation',        type=int, default=2, choices=[1,2], help='Target device: 1 = DaVinci, 2 = Modalix. Default is 2')
-  ap.add_argument('-e',  '--evaluate',          action="store_true", default=False, help="If set, evaluate the quantized model") 
-  ap.add_argument('-cm', '--calib_method',      type=str, default='min_max', choices=['mse','min_max','moving_average','entropy','percentile'], help="Calibration method. Default is min_max") 
+  ap.add_argument('-bd',  '--build_dir',         type=str, default='build', help='Path of build folder. Default is build')
+  ap.add_argument('-m',   '--model_path',        type=str, default='yolox_s_opt_no_reshapes.onnx', help='path to FP model')
+  ap.add_argument('-b',   '--batch_size',        type=int, default=1, help='requested batch size. Default is 1')
+  ap.add_argument('-om',  '--output_model_name', type=str, default='yolox_s_opt_no_reshapes', help="Output model name. Default is yolox_s_opt_no_reshapes")
+  ap.add_argument('-cd',  '--calib_dir',         type=str, default='./calib_images', help='Path to calib images folder. Default is ./calib_images')
+  ap.add_argument('-td',  '--test_dir',          type=str, default='./test_images', help='Path to test images folder. Default is ./test_images')
+  ap.add_argument('-ci',  '--num_calib_images',  type=int, default=50, help='Number of calibration images. Default is 50')
+  ap.add_argument('-ti',  '--num_test_images',   type=int, default=10, help='Number of test images. Default is 10')
+  ap.add_argument('-g',   '--generation',        type=int, default=2, choices=[1,2], help='Target device: 1 = DaVinci, 2 = Modalix. Default is 2')
+  ap.add_argument('-e',   '--evaluate',          action="store_true", default=False, help="If set, evaluate the quantized model") 
+  ap.add_argument('-cm',  '--calib_method',      type=str, default='min_max', choices=['mse','min_max','moving_average','entropy','percentile'], help="Calibration method. Default is min_max") 
+  ap.add_argument('-qb',  '--quant_bits',        type=int, default=8, choices=[8,16], help="Bits for quantization. Default is 8bits")
+  ap.add_argument('-bc',  '--bias_corr',         action='store_true', help="Use bias correction. Default is no bias correction")
+  ap.add_argument('-ce',  '--chan_equal',        action='store_true', help="Use channel equalization. Default is no channel equalization")
+  ap.add_argument('-bf16', '--bf16',             action='store_true', help="Use BlockFloat16 quantization. If not set, quant_bits argument is used")
   args = ap.parse_args()
 
   print('\n'+DIVIDER,flush=True)
