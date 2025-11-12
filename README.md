@@ -248,7 +248,7 @@ print(f'Loaded model from {args.model_path}',flush=True)
 ```
 
 
-We use the _data_prep() function to read the calibration images and process them into a list. Note that the preprocessing for calibration images must match the preprocessing that the model expects, normally defined during training.
+We use the local _data_prep() function to read the calibration images and process them into a list. Note that the preprocessing for calibration images must match the preprocessing that the model expects, normally defined during training.
 
 
 ```python
