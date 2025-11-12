@@ -49,7 +49,7 @@ import tarfile
 import logging
 import cv2
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 import utils
 
@@ -67,7 +67,7 @@ from afe.core.utils import length_hinted
 DIVIDER = '-'*50
 
 
-def _get_onnx_input_shapes_dtypes(model_path):
+def _get_onnx_input_shapes_dtypes(model_path: str) -> Tuple[Dict, Dict]:
     """
     Load an ONNX model and return two dictionaries describing its *true* inputs,
     ignoring any graph initializers (weights/biases).
@@ -216,8 +216,10 @@ def implement(args):
                                                 dtype_dict=input_types_dict)
   
 
-  # load ONNX floating-point model into SiMa's LoadedNet format
+  # select Gen 1 or Gen 2 as target device
   target = gen2_target if args.generation == 2 else gen1_target
+
+  # load ONNX floating-point model into SiMa's LoadedNet format
   loaded_net = load_model(importer_params,target=target,log_level=logging.INFO)
   print(f'Loaded model from {args.model_path}',flush=True)
 
@@ -238,7 +240,7 @@ def implement(args):
 
 
 
-  # set up quantization parameters
+  # set number of quantization bits (INT8 or BF16)
   if (args.bf16):
       weights_quant_scheme=QuantizationScheme(asymmetric=False, per_channel=False, bf16=True)
       activ_quant_scheme=QuantizationScheme(asymmetric=False, per_channel=False, bf16=True)
@@ -246,6 +248,7 @@ def implement(args):
       weights_quant_scheme=QuantizationScheme(asymmetric=False, per_channel=True, bits=8)
       activ_quant_scheme=QuantizationScheme(asymmetric=True, per_channel=False, bits=args.quant_bits)
 
+  # set other quantization parameters
   quant_config = default_quantization.with_activation_quantization(activ_quant_scheme) \
                                      .with_weight_quantization(weights_quant_scheme) \
                                      .with_bias_correction(args.bias_corr) \
@@ -257,7 +260,7 @@ def implement(args):
   quant_model = loaded_net.quantize(calibration_data=length_hinted(len(calib_data),calib_data),
                                     quantization_config=quant_config,
                                     model_name=output_model_name,
-                                    log_level=logging.WARN)
+                                    log_level=logging.INFO)
 
   # optional save of quantized model - saved model can be opened with Netron
   quant_model.save(model_name=output_model_name, output_directory=results_dir)
@@ -308,13 +311,6 @@ def implement(args):
         boxes_xyxy[:, 1] = boxes[:, 1] - boxes[:, 3]/2.
         boxes_xyxy[:, 2] = boxes[:, 0] + boxes[:, 2]/2.
         boxes_xyxy[:, 3] = boxes[:, 1] + boxes[:, 3]/2.
-        # boxes_xyxy /= ratio
-
-        #x_scale = FRAME_WIDTH / MODEL_WIDTH
-        #y_scale = FRAME_HEIGHT / MODEL_HEIGHT
-
-        #boxes_xyxy[:, [0, 2]] = boxes_xyxy[:, [0, 2]] * x_scale
-        #boxes_xyxy[:, [1, 3]] = boxes_xyxy[:, [1, 3]] * y_scale
 
         dets = utils.multiclass_nms(boxes_xyxy, scores, nms_thr=0.5, score_thr=0.5)
 

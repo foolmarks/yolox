@@ -49,6 +49,7 @@ import cv2
 
 DIVIDER = '-'*50
 
+
 # bounding box colors
 color_palette = np.array(
                        [[201, 216, 192],
@@ -186,13 +187,13 @@ def preprocess(image_path: str, target_height: int, target_width: int, transpose
     # Pad with black borders
     img_sq = cv2.copyMakeBorder(img, top, bottom, left, right, borderType=cv2.BORDER_CONSTANT, value=(0, 0, 0))
 
-    # Choose interpolation based on scaling direction
-    interp = cv2.INTER_AREA if side > max(target_height, target_width) else cv2.INTER_LINEAR
-    img_resized = cv2.resize(img_sq, (target_width, target_height), interpolation=interp)
+    # resize to fit model input dimensions
+    img_resized = cv2.resize(img_sq, (target_width, target_height), interpolation=cv2.INTER_LINEAR)
 
     # BGR -> RGB
     img_rgb = cv2.cvtColor(img_resized, cv2.COLOR_BGR2RGB)
 
+    
     # Add batch dimension and convert to float32
     out = img_rgb[np.newaxis, ...].astype(np.float32, copy=False)
 
@@ -203,29 +204,6 @@ def preprocess(image_path: str, target_height: int, target_width: int, transpose
 
     # Ensure contiguous (1, H, W, C), float32
     return img_resized, np.ascontiguousarray(out)
-
-
-
-#def get_model_outputs(input_buffer: List):
-#    '''
-#    reshape model outputs
-#    input_buffer is a list of 3 np arrays
-#    0 - (1, 80, 80, 85)
-#    1 - (1, 40, 40, 85)
-#    2 - (1, 20, 20, 85)
-#
-#    pred is an np array (1, 8400, 85)
-#    '''
-#    print(len(input_buffer))
-#    print(input_buffer[0].shape)
-#    print(input_buffer[1].shape)
-#    print(input_buffer[2].shape)
-#    first_output = np.expand_dims(input_buffer[0], axis=0).reshape(1, -1, 85)  # (1, 80, 80, 85) -> (1, 6400, 85)
-#    second_output = np.expand_dims(input_buffer[1], axis=0).reshape(1, -1, 85) # (1, 40, 40, 85) -> (1, 1600, 85)
-#    third_output = np.expand_dims(input_buffer[2], axis=0).reshape(1, -1, 85)  # (1, 20, 20, 85) -> (1, 400, 85)
-#
-#    pred = np.concatenate((first_output, second_output, third_output), axis=1)
-#    return pred
 
 
 def get_model_outputs(input_buffer: List) -> np.ndarray:
@@ -254,30 +232,54 @@ def get_model_outputs(input_buffer: List) -> np.ndarray:
     return pred
 
 
+
 def demo_postprocess(outputs: np.ndarray, img_size, p6=False):
     '''
-    YOLOX-style decoder that converts raw network predictions into 
-    absolute image-space boxes by adding the cell grid and scaling by the output stride.
+    YOLOX-style decoder that converts raw network predictions into absolute image-space boxes
+    by adding the cell grid and scaling by the output stride.
     '''
+    # containers for per-level grids (cell coordinates) and strides
     grids = []
     expanded_strides = []
+
+    # Feature-map strides used by YOLOX: {8,16,32} (and optionally 64 for P6)
+    # Each stride corresponds to one FPN level’s output head.
     strides = [8, 16, 32] if not p6 else [8, 16, 32, 64]
 
-    hsizes = [img_size[0] // stride for stride in strides]
-    wsizes = [img_size[1] // stride for stride in strides]
-    
+    # For an input image of size (H, W), each stride s produces a feature map of size (H/s, W/s).
+    hsizes = [img_size[0] // stride for stride in strides]  # number of rows per level
+    wsizes = [img_size[1] // stride for stride in strides]  # number of cols per level
+
+    # Build per-level sampling grids and matching stride tensors, then concatenate all levels.
     for hsize, wsize, stride in zip(hsizes, wsizes, strides):
+        # Create meshgrid of integer cell coordinates [0..wsize-1] × [0..hsize-1]
         xv, yv = np.meshgrid(np.arange(wsize), np.arange(hsize))
+        # Stack into (hsize, wsize, 2) where last dim is (x_cell, y_cell), then flatten to (1, hsize*wsize, 2)
         grid = np.stack((xv, yv), 2).reshape(1, -1, 2)
         grids.append(grid)
+
+        # shape = (1, hsize*wsize); we’ll broadcast a (1, hsize*wsize, 1) stride per anchor
         shape = grid.shape[:2]
+        # Fill with the level’s stride so we can scale offsets/sizes from cell units to pixels
         expanded_strides.append(np.full((*shape, 1), stride))
 
+    # Concatenate grids and strides from all levels along anchor dimension: (1, sum(h*w), 2/1)
     grids = np.concatenate(grids, 1)
     expanded_strides = np.concatenate(expanded_strides, 1)
+
+    # Decode center coordinates:
+    #   cx = (tx + x_cell) * stride
+    #   cy = (ty + y_cell) * stride
+    # This writes back into `outputs` in place.
     outputs[..., :2] = (outputs[..., :2] + grids) * expanded_strides
+
+    # Decode sizes:
+    #   w = exp(tw) * stride
+    #   h = exp(th) * stride
+    # (tw, th) are predicted in log-space; exponentiate then scale by stride.
     outputs[..., 2:4] = np.exp(outputs[..., 2:4]) * expanded_strides
 
+    # `outputs` now has pixel-space (cx, cy, w, h) in the first 4 channels; the rest (obj/conf/classes) unchanged.
     return outputs
 
 
@@ -285,47 +287,85 @@ def demo_postprocess(outputs: np.ndarray, img_size, p6=False):
 def _nms(boxes, scores, nms_thr):
     '''
     Single class NMS implemented in Numpy.
+    boxes: (N, 4) in [x1, y1, x2, y2] format
+    scores: (N,) confidence scores for each box
+    nms_thr: IoU threshold above which boxes are suppressed
+    Returns: list of indices of boxes kept after NMS
     '''
+    # Split coordinates for vectorized operations
     x1 = boxes[:, 0]
     y1 = boxes[:, 1]
     x2 = boxes[:, 2]
     y2 = boxes[:, 3]
+
+    # Box areas; "+1" matches the pixel-inclusive box convention
     areas = (x2 - x1 + 1) * (y2 - y1 + 1)
+
+    # Sort indices by descending score (highest first)
     order = scores.argsort()[::-1]
-    keep = []
+
+    keep = []  # indices to keep
     while order.size > 0:
-        i = order[0]
-        keep.append(i)
+        i = order[0]        # current highest-score box index
+        keep.append(i)      # keep it
+
+        # Compute intersection with the rest of the boxes (vectorized)
         xx1 = np.maximum(x1[i], x1[order[1:]])
         yy1 = np.maximum(y1[i], y1[order[1:]])
         xx2 = np.minimum(x2[i], x2[order[1:]])
         yy2 = np.minimum(y2[i], y2[order[1:]])
+
+        # Intersection width/height clipped at zero (no negative overlap)
         w = np.maximum(0.0, xx2 - xx1 + 1)
         h = np.maximum(0.0, yy2 - yy1 + 1)
         inter = w * h
+
+        # IoU with the remaining boxes
         ovr = inter / (areas[i] + areas[order[1:]] - inter)
+
+        # Keep boxes whose IoU is <= threshold (i.e., not highly overlapping)
         inds = np.where(ovr <= nms_thr)[0]
+
+        # Advance: select the next set of candidates (skip suppressed ones)
         order = order[inds + 1]
+
     return keep
+
 
 
 def multiclass_nms(boxes, scores, nms_thr, score_thr, class_agnostic=True):
     '''
     Multiclass NMS implemented in Numpy.
-    Class-agnostic version.
+    Class-agnostic version: NMS is run without separating boxes by class.
+    boxes: (N, 4)
+    scores: (N, C) class scores per box
+    nms_thr: IoU threshold for NMS
+    score_thr: per-box per-top-class score filter
+    class_agnostic: unused flag here; behavior is class-agnostic
+    Returns:
+      dets: (M, 6) where columns are [x1, y1, x2, y2, score, class_id]
+            or None if no box passes the score threshold
     '''
-    cls_inds = scores.argmax(1)
-    cls_scores = scores[np.arange(len(cls_inds)), cls_inds]
+    # For each box, choose the class with the maximum score
+    cls_inds = scores.argmax(1)  # (N,)
+    cls_scores = scores[np.arange(len(cls_inds)), cls_inds]  # (N,)
+
+    # Filter out boxes whose best class score is below threshold
     valid_score_mask = cls_scores > score_thr
     if valid_score_mask.sum() == 0:
         return None
-    valid_scores = cls_scores[valid_score_mask]
-    valid_boxes = boxes[valid_score_mask]
-    valid_cls_inds = cls_inds[valid_score_mask]
+
+    # Gather valid boxes/scores/class indices
+    valid_scores = cls_scores[valid_score_mask]      # (K,)
+    valid_boxes = boxes[valid_score_mask]            # (K, 4)
+    valid_cls_inds = cls_inds[valid_score_mask]      # (K,)
+
+    # Run single-class (class-agnostic) NMS on the filtered set
     keep = _nms(valid_boxes, valid_scores, nms_thr)
+
+    # If any kept, concatenate into final detections: [x1,y1,x2,y2,score,class_id]
     if keep:
         dets = np.concatenate(
             [valid_boxes[keep], valid_scores[keep, None], valid_cls_inds[keep, None]], 1
         )
     return dets
-

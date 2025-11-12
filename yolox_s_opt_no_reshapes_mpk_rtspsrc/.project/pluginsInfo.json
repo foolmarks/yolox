@@ -1,12 +1,12 @@
 {
     "pluginsInfo": [
         {
-            "gid": "processmla",
-            "path": "plugins/processmla"
-        },
-        {
             "gid": "processcvu",
             "path": "plugins/processcvu"
+        },
+        {
+            "gid": "processmla",
+            "path": "plugins/processmla"
         },
         {
             "gid" : "yolox_postproc_overlay",

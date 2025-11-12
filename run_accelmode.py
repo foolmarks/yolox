@@ -198,7 +198,7 @@ def run_main():
     ap.add_argument('-ti', '--num_test_images', type=int, default=10, help='Number of test images. Default is 10')
     ap.add_argument('-u',  '--username',        type=str, default='sima', help='Target device user name. Default is sima')
     ap.add_argument('-p',  '--password',        type=str, default='edgeai', help='Target device password. Default is edgeai')
-    ap.add_argument('-hn', '--hostname',        type=str, default='192.168.1.29', help='Target device IP address. Default is 192.168.1.29')
+    ap.add_argument('-hn', '--hostname',        type=str, default='192.168.8.20', help='Target device IP address. Default is 192.168.8.20')
     args = ap.parse_args()
 
     print('\n'+DIVIDER,flush=True)

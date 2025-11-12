@@ -21,7 +21,7 @@ class MetaStruct:
 
 """
 
-plugin_name = "yolovx_postproc_overlay"   #define PLUGIN_NAME HERE
+plugin_name = "yolox_postproc_overlay"   #define PLUGIN_NAME HERE
 
 out_size = int(1280 * 720 * 1.5)  # outsize of plugin in bytes
 class MyPlugin(AggregatorTemplate):
