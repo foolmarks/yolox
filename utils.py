@@ -206,31 +206,59 @@ def preprocess(image_path: str, target_height: int, target_width: int, transpose
 
 
 
-def get_model_outputs(input_buffer):
-    '''
-    reshape model outputs
-    '''
+#def get_model_outputs(input_buffer: List):
+#    '''
+#    reshape model outputs
+#    input_buffer is a list of 3 np arrays
+#    0 - (1, 80, 80, 85)
+#    1 - (1, 40, 40, 85)
+#    2 - (1, 20, 20, 85)
+#
+#    pred is an np array (1, 8400, 85)
+#    '''
+#    print(len(input_buffer))
+#    print(input_buffer[0].shape)
+#    print(input_buffer[1].shape)
+#    print(input_buffer[2].shape)
+#    first_output = np.expand_dims(input_buffer[0], axis=0).reshape(1, -1, 85)  # (1, 80, 80, 85) -> (1, 6400, 85)
+#    second_output = np.expand_dims(input_buffer[1], axis=0).reshape(1, -1, 85) # (1, 40, 40, 85) -> (1, 1600, 85)
+#    third_output = np.expand_dims(input_buffer[2], axis=0).reshape(1, -1, 85)  # (1, 20, 20, 85) -> (1, 400, 85)
+#
+#    pred = np.concatenate((first_output, second_output, third_output), axis=1)
+#    return pred
 
-    #model_outs = [(80, 80, 85), (40, 40, 85), (20, 20, 85)]
-    #start = 0
-    #model_outputs = []
 
-    # first get box inputs 
-    #for out_shape in model_outs:
-    #    seg_size = np.prod(out_shape)
-    #    arr = input_buffer[start: start+seg_size].reshape(out_shape)
-    #    model_outputs.append(arr)
-    #    start += seg_size
+def get_model_outputs(input_buffer: List) -> np.ndarray:
+    """
+    Flattens multi-scale detector outputs into a single (1, N, C) array.
+    Accepts each tensor as (H, W, C) or (1, H, W, C).
+    """
+    outs = []
+    for x in input_buffer:
+        x = np.asarray(x)
 
-    first_output = np.expand_dims(input_buffer[0], axis=0).reshape(1, -1, 85)  # (1, 80, 80, 85) -> (1, 6400, 85)
-    second_output = np.expand_dims(input_buffer[1], axis=0).reshape(1, -1, 85) # (1, 40, 40, 85) -> (1, 1600, 85)
-    third_output = np.expand_dims(input_buffer[2], axis=0).reshape(1, -1, 85) # (1, 20, 20, 85) -> (1, 400, 85)
+        # Normalize shape: allow (H, W, C) or (1, H, W, C)
+        if x.ndim == 4:
+            if x.shape[0] != 1:
+                raise ValueError(f"Expected batch size 1, got shape {x.shape}")
+            x = x[0]  # drop the batch dim -> (H, W, C)
+        elif x.ndim != 3:
+            raise ValueError(f"Expected (H,W,C) or (1,H,W,C), got shape {x.shape}")
 
-    pred = np.concatenate((first_output, second_output, third_output), axis=1)
+        C = x.shape[-1]  # number of channels (e.g., 85)
+        x = np.ascontiguousarray(x).reshape(1, -1, C)  # -> (1, H*W, C)
+        outs.append(x)
+
+    pred = np.concatenate(outs, axis=1)  # (1, sum_i H_i*W_i, C)
+
     return pred
 
 
-def demo_postprocess(outputs, img_size, p6=False):
+def demo_postprocess(outputs: np.ndarray, img_size, p6=False):
+    '''
+    YOLOX-style decoder that converts raw network predictions into 
+    absolute image-space boxes by adding the cell grid and scaling by the output stride.
+    '''
     grids = []
     expanded_strides = []
     strides = [8, 16, 32] if not p6 else [8, 16, 32, 64]

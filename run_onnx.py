@@ -107,14 +107,16 @@ def implement(args):
         img_bgr, inputs['images'] = utils.preprocess(test_data[i], 640, 640, transpose=True)
     
         # run inference - outputs a list of numpy arrays
-        # outputs shapes: 1, 85, 80, 80) (1, 85, 40, 40) (1, 85, 20, 20)
+        # outputs shapes: (1, 85, 80, 80) (1, 85, 40, 40) (1, 85, 20, 20)
         pred = ort_sess.run(None, inputs)
 
         # convert to NHWC
         for i,p in enumerate(pred):
             pred[i] = np.transpose(p, axes=[0, 2, 3, 1])
 
+        # reshape the outputs
         output = utils.get_model_outputs(pred)
+
         predictions = utils.demo_postprocess(output, (640, 640))[0]
         boxes = predictions[:, :4]
         scores = predictions[:, 4:5] * predictions[:, 5:]
