@@ -589,8 +589,9 @@ Deploy the complete YoloX application:
 
 ```shell
 mpk deploy -f ./yolox_s_opt_no_reshapes_mpk_rtspsrc/project.mpk -d devkit -t <target_ip_address>
-``` 
-## Files & Folders
+```
+
+## Files & Folders in this repo
 
 * yolo_s.onnx -  original YoloX Small model (not used)
 * yolox_surgery_no_reshape.py - graph surgery script (not used)
@@ -604,5 +605,12 @@ mpk deploy -f ./yolox_s_opt_no_reshapes_mpk_rtspsrc/project.mpk -d devkit -t <ta
 * get_fps - scripts for benchmarking
 * calib_images.zip - images for calibration
 * test_images.zip - images for testing
+
+## Acknowledgements
+
+Much of the Python post-processing code was provided by Vivek Kumar of Sima Technologies
+
+
+
 
 
